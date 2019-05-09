@@ -1,0 +1,27 @@
+PREFIX bif:<bif:>
+
+INSERT {
+  []
+    a sd:ServiceDescription ;
+    eg:dbmsId   ?dbmsId ;
+    eg:dbmsName ?dbmsName ;
+    eg:dbmsVersion ?dbmsVersion
+}
+WHERE {
+  SERVICE SILENT <env://REMOTE> {
+    BIND( bif:sys_stat('st_dbms_name')          AS ?dbmsName)
+    BIND( bif:sys_stat('st_dbms_ver')           AS ?dbmsVersion)
+      # ( bif:sys_stat('st_dbms_name')          AS ?dbmsName )
+      # ( bif:sys_stat('st_dbms_ver')           AS ?dbmsVersion )
+      # ( bif:sys_stat('st_build_thread_model') AS ?thread )
+      # ( bif:sys_stat('st_build_opsys_id')     AS ?opsys )
+      # ( bif:sys_stat('st_build_date')         AS ?date )
+      # ( bif:sys_stat('st_lic_owner')          AS ?owner )
+      # ( bif:sys_stat('st_lic_serial_number')  AS ?serial )
+      # WHERE
+      #   {  ?s a ?o  }
+      # LIMIT 1
+  }
+  BIND( REPLACE(REPLACE(?dbmsName, '\\s+', ' '), ' ', '-') AS ?dbmsId)
+}
+

@@ -1,0 +1,37 @@
+
+# Create a resource for the report
+#INSERT { [] a eg:Report }
+
+INSERT DATA {
+  eg:result
+    eg:rdfStoreName <env:STORE_NAME> ;
+    eg:rdfStoreVersion <env:STORE_VERSION>
+}
+
+
+# Test various methods for obtaining blank node labels
+PREFIX ent: <http://www.ontotext.com/owlim/entity#>
+INSERT {
+  eg:result
+    eg:strSupport ?strSupport ;
+    eg:entIdSupport ?entIdSupport ;
+} WHERE {
+
+#  <var:remote>
+  SERVICE <env://REMOTE> {
+    ?b ?p ?o
+#    ?b a eg:BlankNode .
+    OPTIONAL { ?b ent:id ?entId }
+    FILTER(isBLANK(?b))
+    BIND(STR(?b) AS ?l)
+  }
+  UNION { SERVICE SILENT <env://REMOTE> {
+    BIND(afn:bnode(?b) AS ?hpAfnBnode) }
+  }
+  UNION { SERVICE SILENT <env://REMOTE> { BIND(afn:bnode(?b) AS ?apacheAfnBnode) } }
+
+  BIND(IF(BOUND(?l) && ?l != "", true, false) AS ?strSupport)
+  BIND(IF(BOUND(?entId), true, false) AS ?entIdSupport)
+}
+
+
