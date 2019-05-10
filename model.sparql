@@ -4,34 +4,52 @@
 
 INSERT DATA {
   eg:result
-    eg:rdfStoreName <env:STORE_NAME> ;
-    eg:rdfStoreVersion <env:STORE_VERSION>
+    eg:dbmsId <env:DBMS_ID> ;
+    eg:dbmsVersion <env:DBMS_VERSION>
 }
 
 
 # Test various methods for obtaining blank node labels
 PREFIX ent: <http://www.ontotext.com/owlim/entity#>
+PREFIX hpAfn: <http://jena.hpl.hp.com/ARQ/function#>
+PREFIX apacheAfn: <http://jena.apache.org/ARQ/function#>
 INSERT {
   eg:result
     eg:strSupport ?strSupport ;
     eg:entIdSupport ?entIdSupport ;
+    eg:hpAfnBnodeSupport ?hpAfnBnodeSupport ;
+    eg:apacheAfnBnodeSupport ?apacheAfnBnodeSupport
 } WHERE {
 
 #  <var:remote>
-  SERVICE <env://REMOTE> {
-    ?b ?p ?o
+  { SERVICE <env://REMOTE> {
+    { SELECT * {
+      ?b ?p ?o
 #    ?b a eg:BlankNode .
-    OPTIONAL { ?b ent:id ?entId }
-    FILTER(isBLANK(?b))
-    BIND(STR(?b) AS ?l)
-  }
+      OPTIONAL { ?b ent:id ?entId }
+      FILTER(isBLANK(?b))
+      BIND(STR(?b) AS ?l)
+    } LIMIT 1 }
+  } }
   UNION { SERVICE SILENT <env://REMOTE> {
-    BIND(afn:bnode(?b) AS ?hpAfnBnode) }
-  }
-  UNION { SERVICE SILENT <env://REMOTE> { BIND(afn:bnode(?b) AS ?apacheAfnBnode) } }
+    { SELECT * {
+      ?b ?p ?o
+      FILTER(isBLANK(?b))
+      BIND(hpAfn:bnode(?b) AS ?hpAfnBnode)
+    } LIMIT 1 }
+  } }
+  UNION { SERVICE SILENT <env://REMOTE> {
+    { SELECT * {
+      ?b ?p ?o
+      FILTER(isBLANK(?b))
+      BIND(apacheAfn:bnode(?b) AS ?hpAfnBnode)
+    } LIMIT 1}
+  } }
 
   BIND(IF(BOUND(?l) && ?l != "", true, false) AS ?strSupport)
-  BIND(IF(BOUND(?entId), true, false) AS ?entIdSupport)
+  BIND(BOUND(?entId) AS ?entIdSupport)
+  BIND(BOUND(?hpAfnBnode) AS ?hpAfnBnodeSupport)
+  BIND(BOUND(?apacheAfnBnode) AS ?apacheAfnBnodeSupport)
 }
 
 

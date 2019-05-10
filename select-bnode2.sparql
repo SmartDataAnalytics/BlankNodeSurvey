@@ -1,0 +1,40 @@
+PREFIX ent: <http://www.ontotext.com/owlim/entity#>
+PREFIX hpAfn: <http://jena.hpl.hp.com/ARQ/function#>
+PREFIX apacheAfn: <http://jena.apache.org/ARQ/function#>
+INSERT {
+#  eg:bn
+  ?x
+    a eg:BnodeReport ;
+    eg:node ?b ;
+    eg:str ?l ;
+    eg:entId ?entId ;
+    eg:hpAfn ?hpAfnBnode ;
+    eg:apacheAfn ?apacheAfnBnode
+}
+WHERE {
+  BIND(BNODE() AS ?x)
+  { SERVICE SILENT <env://REMOTE> {
+    { SELECT * {
+      ?b ?p ?o
+#    ?b a eg:BlankNode .
+      OPTIONAL { ?b ent:id ?entId }
+      FILTER(isBLANK(?b))
+      BIND(STR(?b) AS ?l)
+    } LIMIT 1 }
+  } }
+  UNION { SERVICE SILENT <env://REMOTE> {
+    { SELECT * {
+      ?b ?p ?o
+      FILTER(isBLANK(?b))
+      BIND(hpAfn:bnode(?b) AS ?hpAfnBnode)
+    } LIMIT 1 }
+  } }
+  UNION { SERVICE SILENT <env://REMOTE> {
+    { SELECT * {
+      ?b ?p ?o
+      FILTER(isBLANK(?b))
+      BIND(apacheAfn:bnode(?b) AS ?apacheAfnBnode)
+    } LIMIT 1}
+  } }
+}
+
