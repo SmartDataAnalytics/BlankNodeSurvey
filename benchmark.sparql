@@ -1,0 +1,43 @@
+# select a random sample of IRIS and bnodes, an
+
+
+# Lookup with STR
+
+INSERT {
+  []
+    a qb:Observation ;
+    eg:id ?seqId ;
+    eg:category ?cat ;
+    eg:value ?s
+
+} WHERE {
+  SERVICE <env://REMOTE> {
+    { SELECT ?bid {
+      ?s a eg:Bnode .
+      FILTER(isBlank(?s))
+      BIND(STR(?s) AS ?bid)
+    } ORDER BY RAND() LIMIT 100 }
+  }
+
+  BIND(eg:str AS ?cat)
+  BIND(sys:nextLong() AS ?seqId)
+  BIND(sys:benchmark(CONCAT("SELECT * { ?x ?y ?z FILTER(STR(?x) = '", ?bid, "')}")) AS ?s)
+}
+
+
+
+
+# Discard 20% of the benchmark values and aggregate avg and stdev
+
+
+PREFIX agg: <http://jena.apache.org/ARQ/function/aggregate#>
+SELECT ?cat (AVG(?v) AS ?avg) (agg:stdev(?v) AS ?stdev) {
+  # Select maxium seq id
+  { SELECT (MAX(?seqId) AS ?maxSeqId) { ?x eg:id ?seqId } GROUP BY ?x }
+  
+  ?s eg:category ?cat ; eg:id ?seqId ; eg:value ?v .
+
+  FILTER(?seqId > ?maxSeqId * 0.2)
+
+} GROUP BY ?cat
+
