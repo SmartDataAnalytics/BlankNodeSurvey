@@ -10,14 +10,14 @@ INSERT {
     eg:time ?time ;
     eg:size ?size
 } WHERE {
-  OPTIONAL { SERVICE <env://REMOTE> {
+  OPTIONAL { SERVICE SILENT <env://REMOTE> {
     { SELECT ?iri {
       ?iri a eg:Iri .
-    } LIMIT 10 }
+    } LIMIT 50 }
   }
 
   BIND(sys:nextLong() AS ?seqId)
-  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE <", <env:REMOTE>, "> { ?x a eg:Iri FILTER(?x = <", STR(?iri), ">) } }")) AS ?br)
+  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { ?x a eg:Iri FILTER(?x = <", STR(?iri), ">) } }")) AS ?br)
   BIND(json:path(?br, "$.time") AS ?time)
   BIND(json:path(?br, "$.size") AS ?size)
   }
@@ -34,16 +34,16 @@ INSERT {
     eg:time ?time ;
     eg:size ?size
 } WHERE {
-  OPTIONAL { SERVICE <env://REMOTE> {
+  OPTIONAL { SERVICE SILENT <env://REMOTE> {
     { SELECT ?bid {
       ?s a eg:Bnode .
       FILTER(isBlank(?s))
       BIND(STR(?s) AS ?bid)
-    } LIMIT 1 }
+    } LIMIT 2 }
   }
 
   BIND(sys:nextLong() AS ?seqId)
-  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE <", <env:REMOTE>, "> { ?x a eg:Bnode FILTER(STR(?x) = '", ?bid, "') } }")) AS ?br)
+  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { ?x a eg:Bnode FILTER(STR(?x) = '", ?bid, "') } }")) AS ?br)
   BIND(json:path(?br, "$.time") AS ?time)
   BIND(json:path(?br, "$.size") AS ?size)
   }
@@ -60,7 +60,7 @@ INSERT {
     eg:time ?time ;
     eg:size ?size
 } WHERE {
-  OPTIONAL { SERVICE <env://REMOTE> {
+  OPTIONAL { SERVICE SILENT <env://REMOTE> {
     { SELECT ?bid {
       ?s a eg:Bnode .
       FILTER(isBlank(?s))
@@ -69,7 +69,7 @@ INSERT {
   }
 
   BIND(sys:nextLong() AS ?seqId)
-  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE <", <env:REMOTE>, "> { ?x a eg:Bnode FILTER(afn:bnode(?x) = '", ?bid, "') } }")) AS ?br)
+  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { ?x a eg:Bnode FILTER(afn:bnode(?x) = '", ?bid, "') } }")) AS ?br)
   BIND(json:path(?br, "$.time") AS ?time)
   BIND(json:path(?br, "$.size") AS ?size)
   }
@@ -88,7 +88,7 @@ INSERT {
     eg:time ?time ;
     eg:size ?size
 } WHERE {
-  OPTIONAL { SERVICE <env://REMOTE> {
+  OPTIONAL { SERVICE SILENT <env://REMOTE> {
     { SELECT ?bid {
       ?s a eg:Bnode ; apf:bnode ?bid
       FILTER(isBlank(?s))
@@ -96,7 +96,7 @@ INSERT {
   }
 
   BIND(sys:nextLong() AS ?seqId)
-  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE <", <env:REMOTE>, "> { ?x a eg:Bnode ; apf:bnode ?bid FILTER(?bid = '", ?bid, "') } }")) AS ?br)
+  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { ?x a eg:Bnode ; apf:bnode ?bid FILTER(?bid = '", ?bid, "') } }")) AS ?br)
   BIND(json:path(?br, "$.time") AS ?time)
   BIND(json:path(?br, "$.size") AS ?size)
   }
@@ -116,7 +116,7 @@ INSERT {
     eg:time ?time ;
     eg:size ?size
 } WHERE {
-  OPTIONAL { SERVICE <env://REMOTE> {
+  OPTIONAL { SERVICE SILENT <env://REMOTE> {
     { SELECT ?bid { 
       ?s a eg:Bnode ; ent:id ?bid
       FILTER(isBlank(?s))
@@ -124,14 +124,14 @@ INSERT {
   }
 
   BIND(sys:nextLong() AS ?seqId)
-  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE <", <env:REMOTE>, "> { ?x a eg:Bnode ; ent:id ?bid FILTER(?bid = '", ?bid, "') } }")) AS ?br)
+  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { ?x a eg:Bnode ; ent:id ?bid FILTER(?bid = '", ?bid, "') } }")) AS ?br)
   BIND(json:path(?br, "$.time") AS ?time)
   BIND(json:path(?br, "$.size") AS ?size)
   }
 }
 
 
-# Lookup with iri property function
+# Lookup with bif:iri_to_id
 INSERT {
   []
     a qb:Observation ;
@@ -140,16 +140,16 @@ INSERT {
     eg:time ?time ;
     eg:size ?size
 } WHERE {
-  OPTIONAL { SERVICE <env://REMOTE> {
+  OPTIONAL { SERVICE SILENT <env://REMOTE> {
     { SELECT ?bid {
       ?s a eg:Bnode .
       FILTER(isBlank(?s))
-      BIND(<LONG::bif:iri_id_num>>(?s) AS ?bid)
-    } LIMIT 2 }
+      BIND(<LONG::bif:iri_id_num>(?s) AS ?bid)
+    } LIMIT 50 }
   }
 
   BIND(sys:nextLong() AS ?seqId)
-  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE <", <env:REMOTE>, "> { ?x a eg:Bnode FILTER(<LONG::bif:iri_id_num>(?x) = '", ?bid, "') } }")) AS ?br)
+  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { ?x a eg:Bnode FILTER(<LONG::bif:iri_id_num>(?x) = ", STR(?bid), ") } }")) AS ?br)
   BIND(json:path(?br, "$.time") AS ?time)
   BIND(json:path(?br, "$.size") AS ?size)
   }
