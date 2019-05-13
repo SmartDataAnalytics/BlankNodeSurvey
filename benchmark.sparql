@@ -1,43 +1,252 @@
 # select a random sample of IRIS and bnodes, an
 
 
+## Reference IRI lookup
+INSERT {
+  []
+    a qb:Observation ;
+    eg:category eg:iri ;
+    eg:seqId ?seqId ;
+    eg:time ?time ;
+    eg:size ?size
+} WHERE {
+  OPTIONAL { SERVICE <env://REMOTE> {
+    { SELECT ?iri {
+      ?iri a eg:Iri .
+    } LIMIT 10 }
+  }
+
+  BIND(sys:nextLong() AS ?seqId)
+  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE <", <env:REMOTE>, "> { ?x a eg:Iri FILTER(?x = <", STR(?iri), ">) } }")) AS ?br)
+  BIND(json:path(?br, "$.time") AS ?time)
+  BIND(json:path(?br, "$.size") AS ?size)
+  }
+}
+
+
 # Lookup with STR
 
 INSERT {
   []
     a qb:Observation ;
-    eg:id ?seqId ;
-    eg:category ?cat ;
-    eg:value ?s
-
+    eg:category eg:str ;
+    eg:seqId ?seqId ;
+    eg:time ?time ;
+    eg:size ?size
 } WHERE {
-  SERVICE <env://REMOTE> {
+  OPTIONAL { SERVICE <env://REMOTE> {
     { SELECT ?bid {
       ?s a eg:Bnode .
       FILTER(isBlank(?s))
       BIND(STR(?s) AS ?bid)
-    } ORDER BY RAND() LIMIT 100 }
+    } LIMIT 1 }
   }
 
-  BIND(eg:str AS ?cat)
   BIND(sys:nextLong() AS ?seqId)
-  BIND(sys:benchmark(CONCAT("SELECT * { ?x ?y ?z FILTER(STR(?x) = '", ?bid, "')}")) AS ?s)
+  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE <", <env:REMOTE>, "> { ?x a eg:Bnode FILTER(STR(?x) = '", ?bid, "') } }")) AS ?br)
+  BIND(json:path(?br, "$.time") AS ?time)
+  BIND(json:path(?br, "$.size") AS ?size)
+  }
+}
+
+
+# Lookup with bnode function
+
+INSERT {
+  []
+    a qb:Observation ;
+    eg:seqId ?seqId ;
+    eg:category eg:afnBnode;
+    eg:time ?time ;
+    eg:size ?size
+} WHERE {
+  OPTIONAL { SERVICE <env://REMOTE> {
+    { SELECT ?bid {
+      ?s a eg:Bnode .
+      FILTER(isBlank(?s))
+      BIND(afn:bnode(?s) AS ?bid)
+    } LIMIT 1 }
+  }
+
+  BIND(sys:nextLong() AS ?seqId)
+  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE <", <env:REMOTE>, "> { ?x a eg:Bnode FILTER(afn:bnode(?x) = '", ?bid, "') } }")) AS ?br)
+  BIND(json:path(?br, "$.time") AS ?time)
+  BIND(json:path(?br, "$.size") AS ?size)
+  }
 }
 
 
 
 
-# Discard 20% of the benchmark values and aggregate avg and stdev
+# Lookup with bnode property function
+
+INSERT {
+  []
+    a qb:Observation ;
+    eg:seqId ?seqId ;
+    eg:category eg:apfBnode;
+    eg:time ?time ;
+    eg:size ?size
+} WHERE {
+  OPTIONAL { SERVICE <env://REMOTE> {
+    { SELECT ?bid {
+      ?s a eg:Bnode ; apf:bnode ?bid
+      FILTER(isBlank(?s))
+    } LIMIT 1 }
+  }
+
+  BIND(sys:nextLong() AS ?seqId)
+  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE <", <env:REMOTE>, "> { ?x a eg:Bnode ; apf:bnode ?bid FILTER(?bid = '", ?bid, "') } }")) AS ?br)
+  BIND(json:path(?br, "$.time") AS ?time)
+  BIND(json:path(?br, "$.size") AS ?size)
+  }
+}
 
 
-PREFIX agg: <http://jena.apache.org/ARQ/function/aggregate#>
-SELECT ?cat (AVG(?v) AS ?avg) (agg:stdev(?v) AS ?stdev) {
-  # Select maxium seq id
-  { SELECT (MAX(?seqId) AS ?maxSeqId) { ?x eg:id ?seqId } GROUP BY ?x }
+
+
+# Lookup with ent:id property function
+
+PREFIX ent: <http://www.ontotext.com/owlim/entity#>
+INSERT {
+  []
+    a qb:Observation ;
+    eg:seqId ?seqId ;
+    eg:category eg:apfBnode;
+    eg:time ?time ;
+    eg:size ?size
+} WHERE {
+  OPTIONAL { SERVICE <env://REMOTE> {
+    { SELECT ?bid { 
+      ?s a eg:Bnode ; ent:id ?bid
+      FILTER(isBlank(?s))
+    } LIMIT 2 }
+  }
+
+  BIND(sys:nextLong() AS ?seqId)
+  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE <", <env:REMOTE>, "> { ?x a eg:Bnode ; ent:id ?bid FILTER(?bid = '", ?bid, "') } }")) AS ?br)
+  BIND(json:path(?br, "$.time") AS ?time)
+  BIND(json:path(?br, "$.size") AS ?size)
+  }
+}
+
+
+# Lookup with iri property function
+INSERT {
+  []
+    a qb:Observation ;
+    eg:seqId ?seqId ;
+    eg:category eg:bifIriToId;
+    eg:time ?time ;
+    eg:size ?size
+} WHERE {
+  OPTIONAL { SERVICE <env://REMOTE> {
+    { SELECT ?bid {
+      ?s a eg:Bnode .
+      FILTER(isBlank(?s))
+      BIND(<LONG::bif:iri_id_num>>(?s) AS ?bid)
+    } LIMIT 2 }
+  }
+
+  BIND(sys:nextLong() AS ?seqId)
+  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE <", <env:REMOTE>, "> { ?x a eg:Bnode FILTER(<LONG::bif:iri_id_num>(?x) = '", ?bid, "') } }")) AS ?br)
+  BIND(json:path(?br, "$.time") AS ?time)
+  BIND(json:path(?br, "$.size") AS ?size)
+  }
+}
+
+
+INSERT {
+  ?s eg:dbmsType ?dbmsType
+} WHERE {
+  ?s a qb:Observation
+  FILTER(NOT EXISTS { ?s eg:dbmsType [] })
+  BIND(sys:getenv('DBMS_TYPE') AS ?tmp)
+  BIND(IF(bound(?tmp), ?tmp, 'unknown-system') AS ?dbmsType)
+}
+
+INSERT {
+  ?s eg:dbmsVersion ?dbmsVersion
+} WHERE {
+  ?s a qb:Observation 
+  FILTER(NOT EXISTS { ?s eg:dbmsVersion [] })
+  BIND(sys:getenv('DBMS_VERSION') AS ?tmp)
+  BIND(IF(bound(?tmp), ?tmp, '0.0.0') AS ?dbmsVersion)
+}
+
+
+INSERT {
+  ?s eg:dbmsId ?dbmsId
+} WHERE {
+  ?s 
+    a qb:Observation ;
+    eg:dbmsType ?dbmsType ;
+    eg:dbmsVersion ?dbmsVersion
+
+  BIND(CONCAT(STR(?dbmsType), ':', STR(?dbmsVersion)) AS ?dbmsId)
   
-  ?s eg:category ?cat ; eg:id ?seqId ; eg:value ?v .
+#  FILTER(NOT EXISTS { ?s eg:dbmsName [] })
+#  BIND(sys:getenv('DBMS_NAME') AS ?tmp)
+#  BIND(IF(bound(?tmp), ?tmp, 'unknown-system') AS ?dbmsId)
+}
 
-  FILTER(?seqId > ?maxSeqId * 0.2)
 
-} GROUP BY ?cat
+
+#PREFIX apf: <http://jena.hpl.hp.com/ARQ/property#>
+#INSERT {
+#  []
+#    a qb:Observation ;
+#    eg:id ?seqId ;
+#    eg:category eg:apfBnode;
+#    eg:time ?time ;
+#    eg:size ?size
+#} WHERE {
+#  SERVICE <env://REMOTE> {
+#    { SELECT ?bid {
+#      ?s a eg:Bnode .
+#      FILTER(isBlank(?s))
+#      ?s apf:bnode ?bid
+#    } ORDER BY RAND() LIMIT 1 }
+#  }
+#
+#  BIND(sys:nextLong() AS ?seqId)
+#  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE <", <env:REMOTE>, "> { ?x ?y ?z FILTER(afn:bnode(?x) = '", ?bid, "') } }")) AS ?br)
+#  BIND(json:path(?br, "$.time") AS ?time)
+#  BIND(json:path(?br, "$.size") AS ?size)
+#}
+
+
+
+
+
+# Discard the first 20% observations and aggregate the remaining values for avg and stdev
+
+SELECT ?dbmsId ?cat (MAX(?seqId) AS ?maxSeqId) { [] eg:dbmsId ?dbmsId ; eg:category ?cat ; eg:seqId ?seqId } GROUP BY ?dbmsId ?cat
+
+#PREFIX agg: <http://jena.apache.org/ARQ/function/aggregate#>
+SELECT ?dbmsId ?cat (xsd:decimal(AVG(?time)) AS ?timeAvg) (xsd:decimal(agg:stdev(?time)) AS ?timeStdev) (xsd:decimal(AVG(?size)) AS ?sizeAvg) {
+  # Select maxium seq id
+#SELECT * {
+  { SELECT ?dbmsId ?cat (MAX(?seqId) AS ?maxSeqId) {
+    []
+      a qb:Observation ;
+      eg:dbmsId ?dbmsId ; eg:category ?cat ; eg:seqId ?seqId
+  } GROUP BY ?dbmsId ?cat }
+
+  BIND(floor(?maxSeqId * 0.2) AS ?seqIdOffset)
+
+#  OPTIONAL {
+#   { SELECT ?cat (AVG(?time) AS ?timeAvg) (xsd:decmimal(agg:stdev(?time)) AS ?timeStdev) (AVG(?size) AS ?sizeAvg) {
+    OPTIONAL {
+    ?s
+      eg:dbmsId ?dbmsId ; eg:category ?cat ; eg:seqId ?seqId ;
+      eg:time ?time ; eg:size ?size
+      FILTER(?seqId >= ?seqIdOffset)
+#    } GROUP BY ?cat
+#      HAVING (?seqId >= ?seqIdOffset)
+    }
+}
+GROUP BY ?dbmsId ?cat
+#HAVING(?seqId >= ?seqIdOffset)
+
 
