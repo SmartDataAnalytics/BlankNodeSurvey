@@ -29,7 +29,7 @@ INSERT {
 INSERT {
   []
     a qb:Observation ;
-    eg:category eg:str ;
+    eg:category ?cat ;
     eg:seqId ?seqId ;
     eg:time ?time ;
     eg:size ?size
@@ -39,14 +39,47 @@ INSERT {
       ?s a eg:Bnode .
       FILTER(isBlank(?s))
       BIND(STR(?s) AS ?bid)
-    } LIMIT 2 }
-  }
+    } LIMIT 10 }
+  } }
 
   BIND(sys:nextLong() AS ?seqId)
-  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { ?x a eg:Bnode FILTER(STR(?x) = '", ?bid, "') } }")) AS ?br)
-  BIND(json:path(?br, "$.time") AS ?time)
-  BIND(json:path(?br, "$.size") AS ?size)
+
+  {
+    BIND(eg:strFn AS ?cat)
+    BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { ?x a eg:Bnode FILTER(STR(?x) = '", ?bid, "') } }")) AS ?br)
+    BIND(json:path(?br, "$.time") AS ?time)
+    BIND(json:path(?br, "$.size") AS ?size)
   }
+  UNION
+  { 
+    BIND(eg:strFilter AS ?cat)
+    BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { ?x a eg:Bnode FILTER(?x = <", ?bid, ">) } }")) AS ?br)
+    BIND(json:path(?br, "$.time") AS ?time)
+    BIND(json:path(?br, "$.size") AS ?size)
+  }
+  UNION
+  {
+    BIND(eg:strBgp AS ?cat)
+    BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { <", ?bid , "> ?p eg:Bnode } }")) AS ?br)
+    BIND(json:path(?br, "$.time") AS ?time)
+    BIND(json:path(?br, "$.size") AS ?size)
+  }
+  UNION
+  {
+    BIND(eg:strBind AS ?cat)
+    BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { BIND(<", ?bid, "> AS ?x) ?x a eg:Bnode } }")) AS ?br)
+    BIND(json:path(?br, "$.time") AS ?time)
+    BIND(json:path(?br, "$.size") AS ?size)
+  }
+  UNION
+  {
+    BIND(eg:strValues AS ?cat)
+    BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { VALUES (?x) { (<", ?bid, ">) } ?x a eg:Bnode } }")) AS ?br)
+    BIND(json:path(?br, "$.time") AS ?time)
+    BIND(json:path(?br, "$.size") AS ?size)
+  }
+
+
 }
 
 
@@ -157,12 +190,12 @@ INSERT {
 
 
 INSERT {
-  ?s eg:dbmsType ?dbmsType
+  ?s eg:dbmsName ?dbmsName
 } WHERE {
   ?s a qb:Observation
-  FILTER(NOT EXISTS { ?s eg:dbmsType [] })
-  BIND(sys:getenv('DBMS_TYPE') AS ?tmp)
-  BIND(IF(bound(?tmp), ?tmp, 'unknown-system') AS ?dbmsType)
+  FILTER(NOT EXISTS { ?s eg:dbmsName [] })
+  BIND(sys:getenv('DBMS_NAME') AS ?tmp)
+  BIND(IF(bound(?tmp), ?tmp, 'unknown-system') AS ?dbmsName)
 }
 
 INSERT {
@@ -180,10 +213,10 @@ INSERT {
 } WHERE {
   ?s 
     a qb:Observation ;
-    eg:dbmsType ?dbmsType ;
+    eg:dbmsName ?dbmsName ;
     eg:dbmsVersion ?dbmsVersion
 
-  BIND(CONCAT(STR(?dbmsType), ':', STR(?dbmsVersion)) AS ?dbmsId)
+  BIND(CONCAT(STR(?dbmsName), ':', STR(?dbmsVersion)) AS ?dbmsId)
   
 #  FILTER(NOT EXISTS { ?s eg:dbmsName [] })
 #  BIND(sys:getenv('DBMS_NAME') AS ?tmp)
