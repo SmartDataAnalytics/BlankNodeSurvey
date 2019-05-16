@@ -1,5 +1,68 @@
 # select a random sample of IRIS and bnodes, an
 
+##
+# Registry of pseudo IRI blank node lookup patterns
+#   will be wrapped with "SELECT * { SERVICE SILENT <_REMOTE_> { _BLP_ } }"
+##
+INSERT DATA {
+  eg:strFilter
+    a eg:BnodeLookupPattern ;
+    rdfs:label "?this a eg:Bnode FILTER(?this = <_BID_STR_>)" .
+
+  eg:strBgp
+    a eg:BnodeLookupPattern ;
+    rdfs:label "<_BID_STR_> ?p eg:Bnode" .
+
+  eg:strBind
+    a eg:BnodeLookupPattern ;
+    rdfs:label "BIND(<_BID_STR_> AS ?this) ?this a eg:Bnode" .
+
+  eg:strValues
+    a eg:BnodeLookupPattern ;
+    rdfs:label "VALUES (?this) { (<_BID_STR_>) } ?this a eg:Bnode" .
+}
+
+
+# Registry of bid prefix patterns
+INSERT DATA {
+  eg:none
+    a eg:BidPrefix ;
+    rdfs:label "" .
+
+  eg:lowDashColon
+    a eg:BidPrefix ;
+    rdfs:label "_:" .
+}
+
+
+# egToStr: Not used yet; function for converting non-string datatype to string suitable for constructing a bnode iri
+
+INSERT DATA {
+  eg:lsStr
+    a eg:FnLookupStrategy ;
+    eg:text "STR(?this)" .
+
+  eg:lsAfnBnode
+    a eg:FnLookupStrategy ;
+    eg:text "afn:bnode(?this)" .
+
+  eg:lsIriIdNum
+    a eg:FnLookupStrategy ;
+    eg:text "<LONG::bif:iri_id_num>(?this)" ;
+    eg:toStr "STR(_BID_)" .
+
+  # Property function lookup strategy
+  eg:lsEntId
+    a eg:PfnLookupStrategy ;
+    eg:text "?this <http://www.ontotext.com/owlim/entity#id> ?bid" ;
+    eg:toStr "STR(_BID_)" .
+
+}
+
+
+
+#?str sys:execSelect(?v1)
+
 
 ## Reference IRI lookup
 INSERT {
@@ -17,14 +80,73 @@ INSERT {
   }
 
   BIND(sys:nextLong() AS ?seqId)
-  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { ?x a eg:Iri FILTER(?x = <", STR(?iri), ">) } }")) AS ?br)
-  BIND(json:path(?br, "$.time") AS ?time)
-  BIND(json:path(?br, "$.size") AS ?size)
+  BIND(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { ?x a eg:Iri FILTER(?x = <", STR(?iri), ">) } }") AS ?queryStr)
+  ?queryStr sys:benchmark(?time ?size)
+#  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { ?x a eg:Iri FILTER(?x = <", STR(?iri), ">) } }")) AS ?br)
+#  BIND(json:path(?br, "$.time") AS ?time)
+#  BIND(json:path(?br, "$.size") AS ?size)
   }
 }
 
+##
+# Construct all possible bid retrieval queries from functions and property function building blocks
+#
+# TODO An improvement would be to get right of explicitly creating the ?seqId here.
+# Instead, we could introduce a queryStr :execSelectWithRowNum(?seqId ?bid) function
+##
 
-# Lookup with STR
+INSERT {
+  []
+    a eg:BidRetrievalQuery ;
+    eg:id ?id ;
+    eg:text ?queryStr ;
+    eg:lookupPattern ?lookupPattern
+}
+#WHERE {}
+#SELECT *
+WHERE {
+  { # Direct bnode retrieval ; reuse blank node ids of the result set ; extract using afn:bnode
+    BIND("SELECT ?bid ?seqId { SERVICE SILENT <_REMOTE_> { { SELECT ?this { ?this a eg:Bnode FILTER(isBlank(?this)) } _LIMIT_ } } BIND(afn:bnode(?this) AS ?bid) BIND(sys:nextLong() AS ?seqId) }" AS ?rawQueryStr) 
+    BIND(eg:direct AS ?lsCat)
+  }
+  UNION
+  { # Function patterns
+    ?lsCat
+      a eg:FnLookupStrategy ;
+      eg:text ?lsStr .
+
+    BIND("SELECT ?bid ?seqId { SERVICE SILENT <_REMOTE_> { { SELECT ?bid { ?this a eg:Bnode FILTER(isBlank(?this)) BIND(_FN_ AS ?bid) } _LIMIT_ } } BIND(sys:nextLong() AS ?seqId) }" AS ?retrievalTemplate)
+    BIND("SELECT ?bid { SERVICE SILENT <_REMOTE_> { { SELECT ?bid { ?this a eg:Bnode FILTER(_FN_ = _BID_TTL_) } } } }" AS ?lookupTemplate)
+
+    BIND(REPLACE(?retrievalTemplate, "_FN_", ?lsStr) AS ?rawQueryStr)
+    BIND(REPLACE(?lookupTemplate, "_FN_", ?lsStr) AS ?lookupPattern)
+  }
+  UNION
+  { # Property Function Patterns
+    ?lsCat
+      a eg:PfnLookupStrategy ;
+      eg:text ?lsStr .
+
+    BIND("SELECT ?bid ?seq { SERVICE SILENT <_REMOTE_> { { SELECT ?bid { ?this a eg:Bnode FILTER(isBlank(?this)) _INJECT_ } _LIMIT_ } } BIND(sys:nextLong() AS ?seqId) }" AS ?retrievalTemplate)   
+    BIND("SELECT ?bid { SERVICE SILENT <_REMOTE_> { { SELECT ?bid { ?this a eg:Bnode . _INJECT_ } } } }" AS ?lookupTemplate)
+
+    BIND(REPLACE(?retrievalTemplate, "_INJECT_", ?lsStr) AS ?rawQueryStr)
+    BIND(REPLACE(?lookupTemplate, "_INJECT_", ?lsStr) AS ?lookupPattern)
+  }
+
+  BIND(REPLACE(REPLACE(?rawQueryStr, '_REMOTE_', <env:REMOTE>), '_LIMIT_', 'LIMIT 10') AS ?queryStr)
+  BIND(afn:localname(?lsCat) AS ?id)
+}
+
+##
+# Actual benchmarking
+#  Build the cartesian between all possible retrieval strategies with all *applicable* lookup strategies
+#  
+#  Applicable means:
+#   - Always try out whether pseudo URI lookups work with the returned ids (pseudo URIS in TP / FILTER / BIND / VALUES)
+#   - For functions, use the corresponding filter statement: BIND(fn(?this) AS ?bid) -> FILTER(fn(?this) = _BID_TTL_)
+#   - For property functions, we can substitue or add filter ?this ent:id ?bid -> ?this ent:id _BID or ?this ent:id ?bid FILTER(?bid = BID)
+##
 
 INSERT {
   []
@@ -33,159 +155,53 @@ INSERT {
     eg:seqId ?seqId ;
     eg:time ?time ;
     eg:size ?size
-} WHERE {
-  OPTIONAL { SERVICE SILENT <env://REMOTE> {
-    { SELECT ?bid {
-      ?s a eg:Bnode .
-      FILTER(isBlank(?s))
-      BIND(STR(?s) AS ?bid)
-    } LIMIT 10 }
-  } }
+}
+#WHERE {}
+#SELECT ?lsCat ?queryStr ?seqId ?bid ?bidStr ?bidTtl ?cat ?lookupPattern ?lookupStr
+WHERE {
+  # Enumerate all retrieval methods
+  ?x
+    a eg:BidRetrievalQuery ;
+    eg:id ?lsCat ;
+    eg:text ?queryStr
 
-  BIND(sys:nextLong() AS ?seqId)
+  # Execute the generated query and obtain its result set
+  OPTIONAL { ?queryStr sys:execSelect(?bid ?seqId) }
 
-  {
-    BIND(eg:strFn AS ?cat)
-    BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { ?x a eg:Bnode FILTER(STR(?x) = '", ?bid, "') } }")) AS ?br)
-    BIND(json:path(?br, "$.time") AS ?time)
-    BIND(json:path(?br, "$.size") AS ?size)
+  ## Enumerate all lookup methods
+
+  { # Lookup using the corresponding method as of the retrieval method
+    ?x eg:lookupPattern ?lookupPattern
+    BIND('fn' AS ?catSuffix)
+    BIND('' AS ?bidPrefix)
   }
   UNION
-  { 
-    BIND(eg:strFilter AS ?cat)
-    BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { ?x a eg:Bnode FILTER(?x = <", ?bid, ">) } }")) AS ?br)
-    BIND(json:path(?br, "$.time") AS ?time)
-    BIND(json:path(?br, "$.size") AS ?size)
-  }
-  UNION
-  {
-    BIND(eg:strBgp AS ?cat)
-    BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { <", ?bid , "> ?p eg:Bnode } }")) AS ?br)
-    BIND(json:path(?br, "$.time") AS ?time)
-    BIND(json:path(?br, "$.size") AS ?size)
-  }
-  UNION
-  {
-    BIND(eg:strBind AS ?cat)
-    BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { BIND(<", ?bid, "> AS ?x) ?x a eg:Bnode } }")) AS ?br)
-    BIND(json:path(?br, "$.time") AS ?time)
-    BIND(json:path(?br, "$.size") AS ?size)
-  }
-  UNION
-  {
-    BIND(eg:strValues AS ?cat)
-    BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { VALUES (?x) { (<", ?bid, ">) } ?x a eg:Bnode } }")) AS ?br)
-    BIND(json:path(?br, "$.time") AS ?time)
-    BIND(json:path(?br, "$.size") AS ?size)
+  { # BNODE IRI Lookup tests
+    ?qpCat
+      a eg:BnodeLookupPattern ;
+      rdfs:label ?body .
+
+    # Blank node id iri patterns (right now only prefixes, but we could again do string substitution)
+    ?bidCat
+      a eg:BidPrefix ;
+      rdfs:label ?bidPrefix .
+
+    BIND(CONCAT(afn:localname(?qpCat), '-', afn:localname(?bidCat)) AS ?catSuffix)
+    BIND('SELECT * { SERVICE SILENT <_REMOTE_> { _BODY_ } }' AS ?lookupTemplate)
+    BIND(REPLACE(?lookupTemplate, '_BODY_', ?body) AS ?lookupPattern)
   }
 
-
-}
-
-
-# Lookup with bnode function
-
-INSERT {
-  []
-    a qb:Observation ;
-    eg:seqId ?seqId ;
-    eg:category eg:afnBnode;
-    eg:time ?time ;
-    eg:size ?size
-} WHERE {
-  OPTIONAL { SERVICE SILENT <env://REMOTE> {
-    { SELECT ?bid {
-      ?s a eg:Bnode .
-      FILTER(isBlank(?s))
-      BIND(afn:bnode(?s) AS ?bid)
-    } LIMIT 1 }
-  }
-
-  BIND(sys:nextLong() AS ?seqId)
-  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { ?x a eg:Bnode FILTER(afn:bnode(?x) = '", ?bid, "') } }")) AS ?br)
-  BIND(json:path(?br, "$.time") AS ?time)
-  BIND(json:path(?br, "$.size") AS ?size)
-  }
-}
+  BIND(CONCAT(?lsCat, '-', ?catSuffix) AS ?cat)
 
 
+  BIND(CONCAT(?bidPrefix, STR(?bid)) AS ?bidStr)
+  BIND(IF(isNumeric(?bid), STR(?bid), CONCAT('"', STR(?bid), '"')) AS ?bidTtl)
+  BIND(REPLACE(REPLACE(REPLACE(?lookupPattern, '_BID_STR_', ?bidStr), '_BID_TTL_', ?bidTtl), '_REMOTE_', <env:REMOTE>) AS ?lookupStr)
 
 
-# Lookup with bnode property function
+#    BIND(CONCAT(?lsCat, '-lookup') AS ?cat)
 
-INSERT {
-  []
-    a qb:Observation ;
-    eg:seqId ?seqId ;
-    eg:category eg:apfBnode;
-    eg:time ?time ;
-    eg:size ?size
-} WHERE {
-  OPTIONAL { SERVICE SILENT <env://REMOTE> {
-    { SELECT ?bid {
-      ?s a eg:Bnode ; apf:bnode ?bid
-      FILTER(isBlank(?s))
-    } LIMIT 1 }
-  }
-
-  BIND(sys:nextLong() AS ?seqId)
-  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { ?x a eg:Bnode ; apf:bnode ?bid FILTER(?bid = '", ?bid, "') } }")) AS ?br)
-  BIND(json:path(?br, "$.time") AS ?time)
-  BIND(json:path(?br, "$.size") AS ?size)
-  }
-}
-
-
-
-
-# Lookup with ent:id property function
-
-PREFIX ent: <http://www.ontotext.com/owlim/entity#>
-INSERT {
-  []
-    a qb:Observation ;
-    eg:seqId ?seqId ;
-    eg:category eg:apfBnode;
-    eg:time ?time ;
-    eg:size ?size
-} WHERE {
-  OPTIONAL { SERVICE SILENT <env://REMOTE> {
-    { SELECT ?bid { 
-      ?s a eg:Bnode ; ent:id ?bid
-      FILTER(isBlank(?s))
-    } LIMIT 2 }
-  }
-
-  BIND(sys:nextLong() AS ?seqId)
-  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { ?x a eg:Bnode ; ent:id ?bid FILTER(?bid = '", ?bid, "') } }")) AS ?br)
-  BIND(json:path(?br, "$.time") AS ?time)
-  BIND(json:path(?br, "$.size") AS ?size)
-  }
-}
-
-
-# Lookup with bif:iri_to_id
-INSERT {
-  []
-    a qb:Observation ;
-    eg:seqId ?seqId ;
-    eg:category eg:bifIriToId;
-    eg:time ?time ;
-    eg:size ?size
-} WHERE {
-  OPTIONAL { SERVICE SILENT <env://REMOTE> {
-    { SELECT ?bid {
-      ?s a eg:Bnode .
-      FILTER(isBlank(?s))
-      BIND(<LONG::bif:iri_id_num>(?s) AS ?bid)
-    } LIMIT 50 }
-  }
-
-  BIND(sys:nextLong() AS ?seqId)
-  BIND(sys:benchmark(CONCAT("SELECT * { SERVICE SILENT <", <env:REMOTE>, "> { ?x a eg:Bnode FILTER(<LONG::bif:iri_id_num>(?x) = ", STR(?bid), ") } }")) AS ?br)
-  BIND(json:path(?br, "$.time") AS ?time)
-  BIND(json:path(?br, "$.size") AS ?size)
-  }
+  ?lookupStr sys:benchmark (?time ?size)
 }
 
 
@@ -280,6 +296,7 @@ SELECT ?dbmsId ?cat (xsd:decimal(AVG(?time)) AS ?timeAvg) (xsd:decimal(agg:stdev
     }
 }
 GROUP BY ?dbmsId ?cat
+ORDER BY ?dbmsId DESC(xsd:decimal(AVG(?size))) ?cat
 #HAVING(?seqId >= ?seqIdOffset)
 
 
