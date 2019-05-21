@@ -1,0 +1,16 @@
+version: '3.1'
+
+services:
+  db:
+    image: stain/jena-fuseki:3.10.0
+    environment:
+      JAVA_XMS: 512m
+      JAVA_XMX: 8g
+      # Note: Admin user is admin; apparently reconfiguration is not supported here
+      ADMIN_PASSWORD: dba
+    volumes:
+      - ./data:/fuseki
+    network_mode: host
+    ports:
+      - "3030:3030"
+

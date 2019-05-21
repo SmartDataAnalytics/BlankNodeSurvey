@@ -16,7 +16,7 @@ while getopts "hv:n:" opt; do
             ;;
         v)  DBMS_VERSION="$OPTARG"
             ;;
-        n)  DBMS_ID="$OPTARG"
+        n)  DBMS_NAME="$OPTARG"
             ;;
     esac
 done
@@ -29,18 +29,18 @@ export REMOTE="$1"
 # Try to determine missing values automatically
 JSON=`sparql-integrate check-version-*.sparql <(echo 'SELECT ?s { ?s a sd:ServiceDescription }') --jq`
 
-if [ -z "$DBMS_ID" ]; then DBMS_ID=`echo "$JSON" | jq -r ".[].s.dbmsId[]"`; fi
+if [ -z "$DBMS_NAME" ]; then DBMS_NAME=`echo "$JSON" | jq -r ".[].s.dbmsName[]"`; fi
 if [ -z "$DBMS_VERSION" ]; then DBMS_VERSION=`echo "$JSON" | jq -r ".[].s.dbmsVersion[]"`; fi
 
 
 # Print settings to enable sanity check
 echoerr "-------------------------------------------------------"
-echoerr -e "DBMS Id: $DBMS_ID\nDBMS Version: $DBMS_VERSION\nURL: $REMOTE\n"
+echoerr -e "DBMS Name: $DBMS_NAME\nDBMS Version: $DBMS_VERSION\nURL: $REMOTE\n"
 
 
 # Request missing mandatory arguments
 error=0
-if [ -z "$DBMS_ID" ]; then error=1; echoerr "[ERROR] dbms name is missing."; fi
+if [ -z "$DBMS_NAME" ]; then error=1; echoerr "[ERROR] dbms name is missing."; fi
 if [ -z "$DBMS_VERSION" ]; then error=1; echoerr "[ERROR] dbms version is missing."; fi
 if [ -z "$REMOTE" ]; then error=1; echoerr "[ERROR] Remote endpoint url is missing"; fi
 
@@ -48,9 +48,14 @@ if [ -z "$REMOTE" ]; then error=1; echoerr "[ERROR] Remote endpoint url is missi
 
 
 #export REMOTE
-export DBMS_ID
+export DBMS_NAME
 export DBMS_VERSION
+export DBMS_ID="$DBMS_NAME:$DBMS_VERSION"
 
+
+sparql-integrate benchmark.sparql
+
+exit 0
 
 #REMOTE=http://localhost:8890/sparql
 sparql-integrate model.sparql spo.sparql

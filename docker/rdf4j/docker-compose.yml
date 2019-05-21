@@ -1,0 +1,17 @@
+version: "3.3"
+
+services:
+  # Triple store
+  bnode-survey:
+    image: yyz1989/rdf4j
+    environment:
+      JVM_PARAMS: "-Xms1g -Xmx8g"
+      RDF4J_DATA: /data 
+    volumes:
+      - ./data:/data
+    network_mode: "host"
+    ports:
+#      - "8700:8080"
+      - "8080:8080"
+    restart: always
+

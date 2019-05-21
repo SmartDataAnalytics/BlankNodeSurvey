@@ -1,0 +1,24 @@
+version: "3.3"
+
+services:
+  # Triple store
+  bnode-survey:
+    image: tenforce/virtuoso
+    environment:
+      SPARQL_UPDATE: "true"
+      DEFAULT_GRAPH: "http://dbpedia.org"
+      VIRT_Parameters_NumberOfBuffers: "680000"
+      VIRT_Parameters_MaxDirtyBuffers: "500000"
+      VIRT_Parameters_MaxVectorSize: "1000000000"
+      VIRT_SPARQL_ResultSetMaxRows: "0"
+      VIRT_SPARQL_MaxQueryCostEstimationTime: "0"
+      VIRT_SPARQL_MaxQueryExecutionTime: "0"
+      VIRT_SPARQL_MaxDataSourceSize: "10737418240"
+    volumes:
+      - ./data:/data
+    network_mode: "host"
+    ports:
+      - "1111:1111"
+      - "8890:8890"
+    restart: always
+

@@ -116,7 +116,7 @@ WHERE {
       eg:text ?lsStr .
 
     BIND("SELECT ?bid ?seqId { SERVICE SILENT <_REMOTE_> { { SELECT ?bid { ?this a eg:Bnode FILTER(isBlank(?this)) BIND(_FN_ AS ?bid) } _LIMIT_ } } BIND(sys:nextLong() AS ?seqId) }" AS ?retrievalTemplate)
-    BIND("SELECT ?bid { SERVICE SILENT <_REMOTE_> { { SELECT ?bid { ?this a eg:Bnode FILTER(_FN_ = _BID_TTL_) } } } }" AS ?lookupTemplate)
+    BIND("SELECT ?this { SERVICE SILENT <_REMOTE_> { { SELECT ?this { ?this a eg:Bnode FILTER(_FN_ = _BID_TTL_) } } } }" AS ?lookupTemplate)
 
     BIND(REPLACE(?retrievalTemplate, "_FN_", ?lsStr) AS ?rawQueryStr)
     BIND(REPLACE(?lookupTemplate, "_FN_", ?lsStr) AS ?lookupPattern)
@@ -127,11 +127,18 @@ WHERE {
       a eg:PfnLookupStrategy ;
       eg:text ?lsStr .
 
-    BIND("SELECT ?bid ?seq { SERVICE SILENT <_REMOTE_> { { SELECT ?bid { ?this a eg:Bnode FILTER(isBlank(?this)) _INJECT_ } _LIMIT_ } } BIND(sys:nextLong() AS ?seqId) }" AS ?retrievalTemplate)   
-    BIND("SELECT ?bid { SERVICE SILENT <_REMOTE_> { { SELECT ?bid { ?this a eg:Bnode . _INJECT_ } } } }" AS ?lookupTemplate)
+    BIND("SELECT ?bid ?seqId { SERVICE SILENT <_REMOTE_> { { SELECT ?bid { ?this a eg:Bnode FILTER(isBlank(?this)) _INJECT_ } _LIMIT_ } } BIND(sys:nextLong() AS ?seqId) }" AS ?retrievalTemplate)
+
+# Variant with filter
+    BIND("SELECT ?this { SERVICE SILENT <_REMOTE_> { { SELECT ?this { ?this a eg:Bnode . _INJECT_ FILTER(?bid = _BID_TTL_) } } } }" AS ?lookupTemplate)
+    BIND(?lsStr AS ?inject)
+
+# Variant with TP
+#    BIND("SELECT ?this { SERVICE SILENT <_REMOTE_> { { SELECT ?this { ?this a eg:Bnode . _INJECT_ } } } }" AS ?lookupTemplate)
+#    BIND(REPLACE(?lsStr, '\\?bid', '_BID_TTL_') AS ?inject)
 
     BIND(REPLACE(?retrievalTemplate, "_INJECT_", ?lsStr) AS ?rawQueryStr)
-    BIND(REPLACE(?lookupTemplate, "_INJECT_", ?lsStr) AS ?lookupPattern)
+    BIND(REPLACE(?lookupTemplate, "_INJECT_", ?inject) AS ?lookupPattern)
   }
 
   BIND(REPLACE(REPLACE(?rawQueryStr, '_REMOTE_', <env:REMOTE>), '_LIMIT_', 'LIMIT 10') AS ?queryStr)
