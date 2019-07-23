@@ -18,6 +18,16 @@ import 'bootstrap-vue/dist/bootstrap-vue.css'
 
 import axios from 'axios';
 
+import VueCodemirror from 'vue-codemirror'
+
+// require styles
+import 'codemirror/lib/codemirror.css'
+
+Vue.use(VueCodemirror, /* { 
+  options: { theme: 'base16-dark', ... },
+  events: ['scroll', ...]
+} */);
+
 // Configure router
 const router = new VueRouter({
     routes,
