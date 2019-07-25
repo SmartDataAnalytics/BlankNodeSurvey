@@ -4,7 +4,7 @@
       <h1>SPARQL Bnode Web Demo</h1>
     </div>
     <div class="row" style="justify-content:center;">
-      <h2>Bridging the muddy parts of your data</h2>
+      <h2>Blank Node Skolemization Demo</h2>
     </div>
 
     <div class="row">
@@ -53,12 +53,13 @@
     <div class="row">
 
       <div class="col-sm-3 offset-sm-1">
-        <select class="form-control" v-model="activeMode">
+        <label for="mode">Mode</label>
+        <select id="mode" class="form-control" v-model="activeMode">
           <option v-for="option in availableModes" v-bind:value="option.id">
             {{ option.label }}
           </option>
         </select>
-        <span>Selected: {{ activeMode }}</span>
+<!--        <span>Selected: {{ activeMode }}</span> -->
 
 <!--
         <b-dropdown id="dropdown-1" text="Mode..." variant="primary">
@@ -85,20 +86,30 @@
 
     <div class="form-text"></div>
 
-    <div class="row" v-show="activeMode == 1">
+    <div class="row">
 
       <div class="col-sm-3 offset-sm-1" v-show="!taskDone">
+<!--
         <b-dropdown text="Profiles ..." variant="primary">
           <b-dropdown-item v-if="availableProfiles.length==0" disabled>(empty)</b-dropdown-item>
           <b-dropdown-item v-for="option in availableProfiles" :selected="option.id==activeProfile" :key="option.id" @click="activeProfile=option">{{option.label}}</b-dropdown-item>
         </b-dropdown> ({{activeProfile.label || '(no profile set)'}})
+-->
+
+        <label for="profile">Profile</label>
+        <select id="profile" class="form-control" v-model="activeProfile">
+          <option v-for="option in availableProfiles" :key="option.id" :value="option">
+            {{ option.label }}
+          </option>
+        </select>
+
       </div>
 
-      <div class="col-sm-6">
+      <div class="col-sm-6" v-show="activeMode == 1">
         <codemirror v-model="outStmt" :options="cmOptions"></codemirror>
       </div>
 
-      <div class="col-sm-1">
+      <div class="col-sm-1" v-show="activeMode == 1">
         <button type="button" class="btn btn-success" @click="activeQuery=outStmt; runQuery();">Run</button>
       </div>
     </div>
@@ -136,17 +147,21 @@
 
     <div class="row">
       <div class="col-sm-7 offset-sm-4">
-        <table class="striped" hover>
-          <tr>
-            <th v-for="varName in activeResultSet.head.vars">{{varName}}</th>
-          </tr>
-          <tr v-for="binding in activeResultSet.results.bindings">
-            <td v-for="varName in activeResultSet.head.vars">
-              <a v-if="binding[varName].type=='uri'" :href="binding[varName].value" @click.prevent="inStmt=`SELECT * { <${binding[varName].value}> ?p ?o }`">{{binding[varName].value.split("/").pop()}}</a>
-              <span v-if="binding[varName].type!='uri'">{{ binding[varName].value }}</span>
-              <span v-if="binding[varName].datatype">binding[varName].datatype</span>
-            </td>
-          </tr>
+        <table class="table table-striped" hover>
+          <thead>
+            <tr>
+              <th v-for="varName in activeResultSet.head.vars">{{varName}}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="binding in activeResultSet.results.bindings">
+              <td v-for="varName in activeResultSet.head.vars">
+                <a v-if="binding[varName].type=='uri'" :href="binding[varName].value" @click.prevent="inStmt=`SELECT * { ?s ?p ?o FILTER(?s = <${binding[varName].value}>) }`">{{binding[varName].value.split("/").pop()}}</a>
+                <span v-if="binding[varName].type!='uri'">{{ binding[varName].value }}</span>
+                <span v-if="binding[varName].datatype">binding[varName].datatype</span>
+              </td>
+            </tr>
+          </tbody>
 		</table>
       </div>
     </div>
@@ -199,7 +214,7 @@ export default {
     return {
       availableEndpoints: [{ id: 1, label: 'DBpedia', url: 'http://dbpedia.org/sparql' }],
       availableQueries: [
-        { id: 1, value: 'SELECT * { ?s ?p ?o }', label: 'Everything' }
+        { id: 1, value: 'SELECT * { ?s ?p ?o FILTER(isBLANK(?s)) } LIMIT 10', label: 'Everything' }
       ],
       historyQueries: [],
       availableProfiles: [],
@@ -269,7 +284,20 @@ export default {
       axios.get(this.endpointUrl, {
         params: { query: this.activeQuery }
       })
-      .then(response => this.activeResultSet = response.data)
+      .then(response => {
+        let tmp = response.data;
+        this.activeResultSet = tmp;
+
+        if(this.activeMode == 2) {
+          axios.get('http://localhost:7531/transform', {
+            params: { profile: this.activeProfile.label, json: tmp }
+          })
+          .then(response => this.activeResultSet = response.data)
+          .catch(function (error) {
+            alert(JSON.stringify(error));
+          })
+        }
+      })
       .catch(function (error) {
         alert(JSON.stringify(error));
       })

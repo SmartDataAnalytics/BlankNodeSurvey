@@ -1,11 +1,15 @@
 package org.aksw.bnode_proxy.cli.main;
 
+import org.apache.jena.query.ARQ;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
 public class MainCliBnodeProxy {
 	public static void main(String[] args) throws Exception {
+		ARQ.enableBlankNodeResultLabels();
+		ARQ.setFalse(ARQ.constantBNodeLabels);
+
 		SpringApplication.run(MainCliBnodeProxy.class, args);
 //		
 //		// Retain blank node labels
